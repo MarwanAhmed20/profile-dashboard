@@ -1,0 +1,117 @@
+export const domainData = [
+  {
+    key: "math",
+    name: "Math",
+    score: 82,
+    strengths: ["Linear algebra", "Calculus basics"],
+    weaknesses: ["Optimization proofs"],
+    notes: "Understands most concepts, needs more practice with proofs.",
+  },
+  {
+    key: "stat",
+    name: "Statistics",
+    score: 78,
+    strengths: ["Descriptive stats", "Distributions"],
+    weaknesses: ["Hypothesis testing"],
+    notes: "Confuses p-values sometimes, add more exercises.",
+  },
+  {
+    key: "ml",
+    name: "Machine Learning",
+    score: 88,
+    strengths: ["Supervised learning", "Regularization"],
+    weaknesses: ["Model interpretability"],
+    notes: "Strong intuition, can push to more advanced topics.",
+  },
+  {
+    key: "dl",
+    name: "Deep Learning",
+    score: 74,
+    strengths: ["Feedforward nets"],
+    weaknesses: ["CNNs", "RNNs"],
+    notes: "Needs more projects and hands-on practice.",
+  },
+  {
+    key: "cv",
+    name: "Computer Vision",
+    score: 70,
+    strengths: ["Image preprocessing"],
+    weaknesses: ["Advanced architectures"],
+    notes: "Still early, build 1–2 mini projects.",
+  },
+  {
+    key: "nlp",
+    name: "NLP",
+    score: 76,
+    strengths: ["Text preprocessing"],
+    weaknesses: ["Transformers"],
+    notes: "Follows concepts but lacks confidence.",
+  },
+  {
+    key: "genai",
+    name: "GenAI",
+    score: 84,
+    strengths: ["Prompting", "API usage"],
+    weaknesses: ["Evaluation"],
+    notes: "Enjoys experiments with LLMs.",
+  },
+  {
+    key: "ds",
+    name: "Data Science",
+    score: 90,
+    strengths: ["EDA", "Storytelling"],
+    weaknesses: ["Experiment tracking"],
+    notes: "Very strong domain, good candidate for portfolio projects.",
+  },
+  {
+    key: "deploy",
+    name: "Deployment",
+    score: 68,
+    strengths: ["Basic APIs"],
+    weaknesses: ["CI/CD", "Monitoring"],
+    notes: "Plan a deployment-focused capsule.",
+  },
+  {
+    key: "portfolio",
+    name: "Portfolio",
+    score: 72,
+    strengths: ["GitHub profile"],
+    weaknesses: ["Project writeups"],
+    notes: "Needs polished case studies.",
+  },
+];
+
+export const currentStudent = {
+  id: 1,
+  name: "Omar Hassan",
+  email: "omar.hassan@example.com",
+  group: "Cohort A – Track: GenAI Engineer",
+  progress: 76,
+  overallSummary:
+    "Omar is progressing well in the AI-Capsule program, with strong data science foundations and growing confidence in GenAI and ML systems.",
+  trainerFeedback:
+    "Focus the next month on deployment practices and a polished portfolio piece. Excellent engagement during sessions.",
+  domains: domainData,
+};
+
+export const students = [
+  currentStudent,
+  {
+    id: 2,
+    name: "Sara Ali",
+    email: "sara.ali@example.com",
+    group: "Cohort A – Track: ML Engineer",
+    progress: 64,
+    track: "ML Engineer",
+    domains: domainData.map((d) => ({ ...d, score: d.score - 10 })),
+  },
+  {
+    id: 3,
+    name: "Youssef Mahmoud",
+    email: "youssef.mahmoud@example.com",
+    group: "Cohort B – Track: Data Scientist",
+    progress: 89,
+    track: "Data Scientist",
+    domains: domainData.map((d) => ({ ...d, score: d.score + 5 })),
+  },
+];
