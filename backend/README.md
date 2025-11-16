@@ -18,9 +18,8 @@ cp .env.example .env
 
 ### 3. Database Setup
 ```bash
-python manage.py makemigrations
-python manage.py migrate
-python manage.py createsuperuser
+chmod +x quick_setup.sh
+./quick_setup.sh
 ```
 
 ### 4. Create Initial Domains
