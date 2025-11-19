@@ -39,6 +39,7 @@ urlpatterns = [
     path('api/auth/', include('apps.users.urls')),
     path('api/students/me/', get_current_student, name='student-me'),
     path('api/students/', include('apps.students.urls')),
+    path('api/courses/', include('apps.students.courses_urls')),
     path('api/assessments/', include('apps.assessments.urls')),
 ]
 

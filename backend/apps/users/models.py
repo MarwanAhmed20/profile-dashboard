@@ -3,19 +3,34 @@ from django.db import models
 
 
 class User(AbstractUser):
-    ROLE_CHOICES = (
-        ('admin', 'Admin'),
-        ('student', 'Student'),
+    email = models.EmailField(unique=True)
+    role = models.CharField(
+        max_length=20,
+        choices=[('admin', 'Admin'), ('student', 'Student')],
+        default='student'
+    )
+    admin_code = models.CharField(
+        max_length=20, 
+        blank=True, 
+        null=True, 
+        unique=True,
+        help_text="Unique code for student registration (admins only, minimum 6 characters)"
     )
     
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='student')
-    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['first_name', 'last_name']
+    
+    # Remove username requirement
+    username = models.CharField(max_length=150, blank=True, null=True)
+    
     class Meta:
         db_table = 'users'
-        ordering = ['-created_at']
-
+    
+    def save(self, *args, **kwargs):
+        # Set username to email if not provided
+        if not self.username:
+            self.username = self.email
+        super().save(*args, **kwargs)
+    
     def __str__(self):
-        return f"{self.username} ({self.role})"
+        return self.email

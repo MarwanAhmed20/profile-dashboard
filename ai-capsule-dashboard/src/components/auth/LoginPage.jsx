@@ -1,32 +1,20 @@
 import React, { useState } from "react";
 
-export default function LoginPage({
-  onLoginAsAdmin,
-  onLoginAsStudent,
-  onGoToSignup,
-}) {
-  const [username, setUsername] = useState("");
+export default function LoginPage({ onLoginAsAdmin, onLoginAsStudent, onGoToSignup }) {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (role) => {
-    if (!username || !password) {
-      setError("Please enter username and password");
-      return;
-    }
-
+  const handleLogin = async (e) => {
+    e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      if (role === "admin") {
-        await onLoginAsAdmin(username, password);
-      } else {
-        await onLoginAsStudent(username, password);
-      }
+      await onLoginAsStudent(email, password);
     } catch (err) {
-      setError(err.message || "Login failed. Please check your credentials.");
+      setError(err.message || "Invalid credentials");
     } finally {
       setLoading(false);
     }
@@ -36,9 +24,7 @@ export default function LoginPage({
     <div className="w-full max-w-md space-y-8">
       <div className="text-center">
         <h2 className="text-3xl font-bold tracking-tight">Welcome Back</h2>
-        <p className="mt-2 text-sm text-slate-400">
-          Sign in to your account to continue
-        </p>
+        <p className="mt-2 text-sm text-slate-400">Sign in to your account</p>
       </div>
 
       {error && (
@@ -47,16 +33,17 @@ export default function LoginPage({
         </div>
       )}
 
-      <div className="space-y-4">
+      <form onSubmit={handleLogin} className="space-y-6">
         <div>
-          <label className="block text-sm font-medium mb-2">Username</label>
+          <label className="block text-sm font-medium mb-2">Email Address</label>
           <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter your username"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
             disabled={loading}
+            placeholder="you@example.com"
+            className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-200 placeholder:text-slate-500"
           />
         </div>
 
@@ -66,43 +53,21 @@ export default function LoginPage({
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && handleLogin("admin")}
-            className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter your password"
+            required
             disabled={loading}
+            placeholder="Enter your password"
+            className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-200 placeholder:text-slate-500"
           />
         </div>
 
-        <div className="space-y-3 pt-4">
-          <button
-            onClick={() => handleLogin("admin")}
-            disabled={loading}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
-          >
-            {loading ? "Signing in..." : "Sign in as Admin"}
-          </button>
-
-          <button
-            onClick={() => handleLogin("student")}
-            disabled={loading}
-            className="w-full py-3 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
-          >
-            {loading ? "Signing in..." : "Sign in as Student"}
-          </button>
-        </div>
-
-        <div className="text-center text-sm text-slate-400 pt-4">
-          <p>Demo credentials:</p>
-          <p className="mt-1">
-            Admin:{" "}
-            <span className="text-blue-400">admin / admin123</span>
-          </p>
-          <p className="mt-1">
-            Student:{" "}
-            <span className="text-blue-400">john_doe / student123</span>
-          </p>
-        </div>
-      </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed rounded-lg font-medium transition-colors text-lg"
+        >
+          {loading ? 'Signing in...' : 'Sign In'}
+        </button>
+      </form>
 
       <div className="text-center text-sm">
         <span className="text-slate-400">Don't have an account? </span>

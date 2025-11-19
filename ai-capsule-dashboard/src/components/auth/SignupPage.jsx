@@ -1,41 +1,124 @@
-import React, { useState } from "react";
-import { authAPI } from "../../services/api";
+import React, { useState, useEffect } from "react";
+import { authAPI, coursesAPI } from "../../services/api";
 
 export default function SignupPage({ onGoToLogin }) {
   const [formData, setFormData] = useState({
-    username: "",
     email: "",
     first_name: "",
     last_name: "",
     password: "",
     password2: "",
     role: "student",
+    course_id: "",
+    admin_code: "",
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
+
+  useEffect(() => {
+    // Fetch active courses for registration
+    const fetchCourses = async () => {
+      try {
+        const response = await fetch('http://127.0.0.1:8000/api/students/courses/active/');
+        const data = await response.json();
+        setCourses(data);
+      } catch (err) {
+        console.error('Failed to load courses:', err);
+        setCourses([]);
+      } finally {
+        setLoadingCourses(false);
+      }
+    };
+    fetchCourses();
+  }, []);
+
+  const validatePassword = (password) => {
+    const errors = [];
+    if (password.length < 8) {
+      errors.push("At least 8 characters long");
+    }
+    if (!/[A-Z]/.test(password)) {
+      errors.push("Contains uppercase letter");
+    }
+    if (!/[a-z]/.test(password)) {
+      errors.push("Contains lowercase letter");
+    }
+    if (!/[0-9]/.test(password)) {
+      errors.push("Contains a number");
+    }
+    if (!/[!@#$%^&*]/.test(password)) {
+      errors.push("Contains special character (!@#$%^&*)");
+    }
+    return errors;
+  };
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    
+    if (name === "password") {
+      setPasswordErrors(validatePassword(value));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
+    const passwordValidationErrors = validatePassword(formData.password);
+    if (passwordValidationErrors.length > 0) {
+      setError("Password does not meet requirements");
+      return;
+    }
+
     if (formData.password !== formData.password2) {
       setError("Passwords do not match");
+      return;
+    }
+
+    if (!formData.course_id) {
+      setError("Please select a course");
+      return;
+    }
+
+    if (!formData.admin_code) {
+      setError("Please enter admin code");
       return;
     }
 
     setLoading(true);
 
     try {
-      await authAPI.register(formData);
+      const registrationData = {
+        ...formData,
+        course_id: parseInt(formData.course_id),
+        admin_code: formData.admin_code.toUpperCase()
+      };
+      await authAPI.register(registrationData);
       setSuccess(true);
       setTimeout(() => onGoToLogin(), 2000);
     } catch (err) {
-      setError(err.message || "Registration failed. Please try again.");
+      // Handle Django validation errors
+      if (err.message && typeof err.message === 'string') {
+        try {
+          const errorData = JSON.parse(err.message);
+          if (errorData.email) {
+            setError(`Email: ${errorData.email[0]}`);
+          } else if (errorData.password) {
+            setError(`Password: ${errorData.password[0]}`);
+          } else {
+            setError(Object.values(errorData).flat().join(', '));
+          }
+        } catch {
+          setError(err.message || "Registration failed. Please try again.");
+        }
+      } else {
+        setError("Registration failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -46,6 +129,7 @@ export default function SignupPage({ onGoToLogin }) {
       <div className="w-full max-w-md text-center space-y-4">
         <div className="text-green-400 text-5xl mb-4">✓</div>
         <h2 className="text-2xl font-bold">Registration Successful!</h2>
+        <p className="text-slate-400">Admin has been notified.</p>
         <p className="text-slate-400">Redirecting to login...</p>
       </div>
     );
@@ -93,20 +177,7 @@ export default function SignupPage({ onGoToLogin }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Username</label>
-          <input
-            type="text"
-            name="username"
-            value={formData.username}
-            onChange={handleChange}
-            required
-            disabled={loading}
-            className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-2">Email</label>
+          <label className="block text-sm font-medium mb-2">Email Address *</label>
           <input
             type="email"
             name="email"
@@ -114,12 +185,71 @@ export default function SignupPage({ onGoToLogin }) {
             onChange={handleChange}
             required
             disabled={loading}
+            placeholder="you@example.com"
             className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Password</label>
+          <label className="block text-sm font-medium mb-2">Admin Code *</label>
+          <input
+            type="text"
+            name="admin_code"
+            value={formData.admin_code}
+            onChange={(e) => {
+              const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+              if (value.length <= 20) {
+                setFormData({ ...formData, admin_code: value });
+              }
+            }}
+            required
+            minLength={6}
+            maxLength={20}
+            disabled={loading}
+            placeholder="Enter admin code"
+            className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase font-mono text-lg text-center tracking-wider"
+          />
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-xs text-slate-400">
+              Get this code from your program administrator (min. 6 chars)
+            </p>
+            <span className={`text-xs font-semibold ${
+              formData.admin_code.length >= 6 ? 'text-green-400' : 'text-slate-500'
+            }`}>
+              {formData.admin_code.length}/20
+            </span>
+          </div>
+          {formData.admin_code.length > 0 && formData.admin_code.length < 6 && (
+            <p className="text-xs text-yellow-400 mt-1">
+              ⚠️ Admin code must be at least 6 characters
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">Select Course *</label>
+          <select
+            name="course_id"
+            value={formData.course_id}
+            onChange={handleChange}
+            required
+            disabled={loading || loadingCourses}
+            className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">-- Select a course --</option>
+            {courses.map(course => (
+              <option key={course.id} value={course.id}>
+                {course.name} ({course.duration_weeks} weeks, {course.domains?.length || 0} domains)
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-slate-400 mt-1">
+            {loadingCourses ? 'Loading courses...' : courses.length === 0 ? 'No courses available' : `${courses.length} courses available`}
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">Password *</label>
           <input
             type="password"
             name="password"
@@ -129,10 +259,21 @@ export default function SignupPage({ onGoToLogin }) {
             disabled={loading}
             className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          {formData.password && (
+            <div className="mt-2 text-xs space-y-1">
+              <div className="text-slate-400 font-medium mb-1">Password must have:</div>
+              {["At least 8 characters long", "Contains uppercase letter", "Contains lowercase letter", "Contains a number", "Contains special character (!@#$%^&*)"].map((req, idx) => (
+                <div key={idx} className={`flex items-center gap-2 ${passwordErrors.includes(req) ? 'text-red-400' : 'text-green-400'}`}>
+                  <span>{passwordErrors.includes(req) ? '✗' : '✓'}</span>
+                  <span>{req}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Confirm Password</label>
+          <label className="block text-sm font-medium mb-2">Confirm Password *</label>
           <input
             type="password"
             name="password2"
@@ -146,7 +287,7 @@ export default function SignupPage({ onGoToLogin }) {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || passwordErrors.length > 0 || courses.length === 0}
           className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
         >
           {loading ? 'Creating Account...' : 'Create Account'}

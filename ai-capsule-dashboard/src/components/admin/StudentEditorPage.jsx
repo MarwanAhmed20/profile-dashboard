@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft } from "lucide-react";
+import DomainScoreEditor from "./DomainScoreEditor";
+import { coursesAPI } from "../../services/api";
 
 export default function StudentEditorPage({
   mode,
@@ -13,36 +14,62 @@ export default function StudentEditorPage({
     email: "",
     first_name: "",
     last_name: "",
-    student_id: "",
-    grade_level: "",
-    overall_score: 0,
     password: "",
+    next_milestone: "Portfolio checkpoint",
+    total_domains: 10,
+    overall_summary: "",
+    trainer_feedback: "",
+    program_start_date: "",
+    course_id: null,
   });
 
+  const [courses, setCourses] = useState([]);
   const [domainScores, setDomainScores] = useState([]);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [loadingCourses, setLoadingCourses] = useState(false);
+
+  const loadCourses = async () => {
+    setLoadingCourses(true);
+    try {
+      const data = await coursesAPI.getAll();
+      console.log('Courses loaded:', data);
+      const coursesArray = Array.isArray(data) ? data : data.results || [];
+      setCourses(coursesArray.filter(c => c.is_active));
+    } catch (err) {
+      console.error('Failed to load courses:', err);
+    } finally {
+      setLoadingCourses(false);
+    }
+  };
 
   useEffect(() => {
+    loadCourses();
+
     if (mode === "edit" && student) {
       setFormData({
-        username: student.user?.username || "",
         email: student.user?.email || "",
         first_name: student.user?.first_name || "",
         last_name: student.user?.last_name || "",
-        student_id: student.student_id || "",
-        grade_level: student.grade_level || "",
-        overall_score: parseFloat(student.overall_score || 0),
         password: "",
+        program: student.course?.name || "AI-Capsule",
+        next_milestone: student.next_milestone || "Portfolio checkpoint",
+        total_domains: student.total_domains || 10,
+        overall_summary: student.overall_summary || "",
+        trainer_feedback: student.trainer_feedback || "",
+        program_start_date: student.program_start_date || "",
+        course_id: student.course?.id || null,
       });
 
-      // Map existing domain scores
+      // Map existing domain scores with strengths and weaknesses
       if (student.domain_scores && Array.isArray(student.domain_scores)) {
         setDomainScores(
           student.domain_scores.map((ds) => ({
             domain_id: ds.domain,
             domain_name: ds.domain_name,
             score: parseFloat(ds.score || 0),
+            strengths: ds.strengths || [],
+            weaknesses: ds.weaknesses || [],
           }))
         );
       }
@@ -53,6 +80,8 @@ export default function StudentEditorPage({
           domain_id: d.id,
           domain_name: d.name,
           score: 0,
+          strengths: [],
+          weaknesses: [],
         }))
       );
     }
@@ -76,15 +105,71 @@ export default function StudentEditorPage({
     );
   };
 
+  const handleStrengthsChange = (domainId, strengths) => {
+    setDomainScores((prev) =>
+      prev.map((ds) =>
+        ds.domain_id === domainId ? { ...ds, strengths } : ds
+      )
+    );
+  };
+
+  const handleWeaknessesChange = (domainId, weaknesses) => {
+    setDomainScores((prev) =>
+      prev.map((ds) =>
+        ds.domain_id === domainId ? { ...ds, weaknesses } : ds
+      )
+    );
+  };
+
+  const handleCourseChange = async (e) => {
+    const courseId = e.target.value ? parseInt(e.target.value) : null;
+    const selectedCourse = courses.find(c => c.id === courseId);
+    
+    if (selectedCourse) {
+      setFormData(prev => ({
+        ...prev,
+        course_id: courseId,
+        program: selectedCourse.name,
+        program_start_date: selectedCourse.start_date,
+        total_domains: selectedCourse.domains.length,
+      }));
+      
+      // Update domain scores based on course domains
+      if (selectedCourse.domains && selectedCourse.domains.length > 0) {
+        const existingScoresMap = {};
+        domainScores.forEach(ds => {
+          existingScoresMap[ds.domain_id] = ds;
+        });
+        
+        const newDomainScores = selectedCourse.domains.map(domain => {
+          if (existingScoresMap[domain.id]) {
+            return {
+              ...existingScoresMap[domain.id],
+              domain_name: domain.name // Update name in case it changed
+            };
+          }
+          return {
+            domain_id: domain.id,
+            domain_name: domain.name,
+            score: 0,
+            strengths: [],
+            weaknesses: [],
+          };
+        });
+        
+        setDomainScores(newDomainScores);
+      }
+    } else {
+      setFormData(prev => ({ ...prev, course_id: null }));
+    }
+  };
+
   const validate = () => {
     const newErrors = {};
 
-    if (!formData.username.trim()) newErrors.username = "Username is required";
     if (!formData.email.trim()) newErrors.email = "Email is required";
     if (!formData.first_name.trim()) newErrors.first_name = "First name is required";
     if (!formData.last_name.trim()) newErrors.last_name = "Last name is required";
-    if (!formData.student_id.trim()) newErrors.student_id = "Student ID is required";
-    if (!formData.grade_level.trim()) newErrors.grade_level = "Grade level is required";
     
     if (mode === "add" && !formData.password.trim()) {
       newErrors.password = "Password is required for new students";
@@ -109,12 +194,29 @@ export default function StudentEditorPage({
         email: formData.email,
         first_name: formData.first_name,
         last_name: formData.last_name,
-        student_id: formData.student_id,
-        grade_level: formData.grade_level,
-        overall_score: parseFloat(formData.overall_score || 0),
+        program: formData.program,
+        next_milestone: formData.next_milestone,
+        program_start_date: formData.program_start_date || null,
+        course_id: formData.course_id || null,
+        total_domains: parseInt(formData.total_domains || 10),
+        overall_summary: formData.overall_summary,
+        trainer_feedback: formData.trainer_feedback,
         domains: domainScores.map((ds) => ({
           domain_id: ds.domain_id,
           score: parseFloat(ds.score),
+          strengths: (ds.strengths || [])
+            .filter(s => s.title && s.title.trim())
+            .map(s => ({
+              title: s.title.trim(),
+              description: s.description || ''
+            })),
+          weaknesses: (ds.weaknesses || [])
+            .filter(w => w.title && w.title.trim())
+            .map(w => ({
+              title: w.title.trim(),
+              description: w.description || '',
+              improvement_suggestion: w.improvement_suggestion || ''
+            })),
         })),
       };
 
@@ -122,6 +224,8 @@ export default function StudentEditorPage({
       if (formData.password) {
         payload.password = formData.password;
       }
+
+      console.log('Submitting payload:', JSON.stringify(payload, null, 2));
 
       if (onSave) {
         if (mode === "edit") {
@@ -139,13 +243,6 @@ export default function StudentEditorPage({
       setLoading(false);
     }
   };
-
-  const gradeLevels = [
-    "9th Grade",
-    "10th Grade",
-    "11th Grade",
-    "12th Grade",
-  ];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -209,24 +306,7 @@ export default function StudentEditorPage({
               )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Username *
-              </label>
-              <input
-                type="text"
-                name="username"
-                value={formData.username}
-                onChange={handleChange}
-                disabled={mode === "edit"}
-                className={`w-full px-4 py-2 bg-slate-700 border ${
-                  errors.username ? "border-red-500" : "border-slate-600"
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50`}
-              />
-              {errors.username && (
-                <p className="text-red-400 text-sm mt-1">{errors.username}</p>
-              )}
-            </div>
+
 
             <div>
               <label className="block text-sm font-medium mb-2">
@@ -248,44 +328,15 @@ export default function StudentEditorPage({
 
             <div>
               <label className="block text-sm font-medium mb-2">
-                Student ID *
+                Student ID
               </label>
               <input
                 type="text"
-                name="student_id"
-                value={formData.student_id}
-                onChange={handleChange}
-                className={`w-full px-4 py-2 bg-slate-700 border ${
-                  errors.student_id ? "border-red-500" : "border-slate-600"
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                value={student?.student_id || 'Auto-generated'}
+                disabled
+                className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg opacity-50 cursor-not-allowed"
               />
-              {errors.student_id && (
-                <p className="text-red-400 text-sm mt-1">{errors.student_id}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Grade Level *
-              </label>
-              <select
-                name="grade_level"
-                value={formData.grade_level}
-                onChange={handleChange}
-                className={`w-full px-4 py-2 bg-slate-700 border ${
-                  errors.grade_level ? "border-red-500" : "border-slate-600"
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-              >
-                <option value="">Select grade level</option>
-                {gradeLevels.map((grade) => (
-                  <option key={grade} value={grade}>
-                    {grade}
-                  </option>
-                ))}
-              </select>
-              {errors.grade_level && (
-                <p className="text-red-400 text-sm mt-1">{errors.grade_level}</p>
-              )}
+              <p className="text-xs text-slate-400 mt-1">Auto-generated on creation</p>
             </div>
 
             <div>
@@ -309,32 +360,117 @@ export default function StudentEditorPage({
           </div>
         </div>
 
-        {/* Domain Scores */}
+        {/* Program & Progress Information */}
         <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <h2 className="text-xl font-semibold mb-4">Domain Scores</h2>
+          <h2 className="text-xl font-semibold mb-4">Program & Progress</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium mb-2">Select Course</label>
+              <select
+                value={formData.course_id || ''}
+                onChange={handleCourseChange}
+                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">No Course (Manual Setup)</option>
+                {Array.isArray(courses) && courses.map(course => (
+                  <option key={course.id} value={course.id}>
+                    {course.name} ({course.duration_weeks} weeks, {course.domains?.length || 0} domains)
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-400 mt-1">
+                {formData.course_id 
+                  ? '✅ Course domains synced automatically'
+                  : `Select a course (${courses.length} available)`}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Next Milestone</label>
+              <input
+                type="text"
+                name="next_milestone"
+                value={formData.next_milestone}
+                onChange={handleChange}
+                placeholder="e.g., Portfolio checkpoint"
+                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Overall Score
+              </label>
+              <input
+                type="text"
+                value={student?.overall_score ? `${parseFloat(student.overall_score).toFixed(1)}%` : 'Auto-calculated'}
+                disabled
+                className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg opacity-50 cursor-not-allowed"
+              />
+              <p className="text-xs text-slate-400 mt-1">Calculated automatically from domain scores</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Domains Mastered
+              </label>
+              <input
+                type="text"
+                value={student?.domains_mastered !== undefined 
+                  ? `${student.domains_mastered} / ${formData.total_domains}`
+                  : 'Auto-calculated'}
+                disabled
+                className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg opacity-50 cursor-not-allowed"
+              />
+              <p className="text-xs text-slate-400 mt-1">Auto-counted (scores ≥ 80%)</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Feedback Section */}
+        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+          <h2 className="text-xl font-semibold mb-4">Summary & Feedback</h2>
           <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Overall Summary</label>
+              <textarea
+                name="overall_summary"
+                value={formData.overall_summary}
+                onChange={handleChange}
+                placeholder="Write an overall summary of the student's progress..."
+                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                rows="4"
+              />
+              <p className="text-xs text-slate-400 mt-1">Visible to student and admin</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Trainer Feedback</label>
+              <textarea
+                name="trainer_feedback"
+                value={formData.trainer_feedback}
+                onChange={handleChange}
+                placeholder="Provide specific trainer feedback..."
+                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                rows="4"
+              />
+              <p className="text-xs text-slate-400 mt-1">Trainer's perspective on progress and areas to focus</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Domain Scores with Strengths & Weaknesses */}
+        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+          <h2 className="text-xl font-semibold mb-4">Domain Scores & Feedback</h2>
+          <div className="space-y-6">
             {domainScores.map((ds) => (
-              <div key={ds.domain_id} className="flex items-center gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-2">
-                    {ds.domain_name || "Unknown Domain"}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    value={ds.score}
-                    onChange={(e) =>
-                      handleDomainScoreChange(ds.domain_id, e.target.value)
-                    }
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="text-2xl font-bold text-blue-400 min-w-[80px] text-right">
-                  {ds.score.toFixed(1)}%
-                </div>
-              </div>
+              <DomainScoreEditor
+                key={ds.domain_id}
+                domainScore={ds}
+                onScoreChange={handleDomainScoreChange}
+                onStrengthsChange={handleStrengthsChange}
+                onWeaknessesChange={handleWeaknessesChange}
+              />
             ))}
           </div>
         </div>

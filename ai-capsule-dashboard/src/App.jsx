@@ -11,23 +11,27 @@ import Sidebar from "./components/layout/Sidebar";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import StudentDashboard from "./components/student/StudentDashboard";
 import StudentEditorPage from "./components/admin/StudentEditorPage";
+import CoursesPage from './components/admin/CoursesPage';
+import DomainsManagementPage from './components/admin/DomainsManagementPage';
+import AdminCodeManager from './components/admin/AdminCodeManager';
 
-import { authAPI, studentsAPI, domainsAPI } from "./services/api";
+import { authAPI, studentsAPI, domainsAPI, coursesAPI } from "./services/api";
 
 export default function App() {
   const [authScreen, setAuthScreen] = useState("login");
   const [role, setRole] = useState(null);
   const [studentTab, setStudentTab] = useState("home");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [adminPage, setAdminPage] = useState("list");
+  const [adminPage, setAdminPage] = useState("list"); // "list", "view", "edit", "add", "courses", "domains", "admin-code"
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [students, setStudents] = useState([]);
   const [currentStudent, setCurrentStudent] = useState(null);
   const [domains, setDomains] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem("access_token");
     if (token) {
       loadUserData();
     } else {
@@ -46,10 +50,29 @@ export default function App() {
       
       if (profile.role === 'admin') {
         const studentsData = await studentsAPI.getAll();
-        setStudents(studentsData.results || studentsData); // Handle paginated response
+        setStudents(studentsData.results || studentsData);
+
+        try {
+          const coursesData = await coursesAPI.getAll();
+          console.log('Courses response:', coursesData);
+          const coursesArray = Array.isArray(coursesData) ? coursesData : (coursesData.results || []);
+          console.log('Setting courses:', coursesArray);
+          setCourses(coursesArray);
+        } catch (error) {
+          console.error('Failed to load courses:', error);
+          setCourses([]);
+        }
       } else if (profile.role === 'student') {
-        const studentData = await studentsAPI.getMe();
-        setCurrentStudent(studentData);
+        try {
+          const studentData = await studentsAPI.getMe();
+          console.log('Current student data:', studentData);
+          setCurrentStudent(studentData);
+        } catch (error) {
+          console.error('No student profile found:', error);
+          // Show a friendly message to the user
+          alert('No student profile found. Please contact an administrator to create your profile.');
+          handleLogout();
+        }
       }
     } catch (error) {
       console.error('Failed to load user data:', error);
@@ -59,16 +82,16 @@ export default function App() {
     }
   };
 
-  const handleLogin = async (username, password, loginRole) => {
+  const handleLogin = async (email, password, loginRole) => {
     try {
-      const data = await authAPI.login(username, password);
+      const data = await authAPI.login(email, password);
       localStorage.setItem('access_token', data.access);
       localStorage.setItem('refresh_token', data.refresh);
       setRole(loginRole);
       setAuthScreen("app");
       await loadUserData();
     } catch (error) {
-      alert('Login failed: ' + error.message);
+      throw error; // Re-throw to be caught by LoginPage
     }
   };
 
@@ -124,10 +147,10 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <div className="text-slate-50 text-xl">Loading...</div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+          <div className="text-slate-900 dark:text-slate-50 text-xl">Loading...</div>
         </div>
       </div>
     );
@@ -138,8 +161,8 @@ export default function App() {
     return (
       <AuthShell>
         <LoginPage
-          onLoginAsAdmin={(username, password) => handleLogin(username, password, 'admin')}
-          onLoginAsStudent={(username, password) => handleLogin(username, password, 'student')}
+          onLoginAsAdmin={handleLogin}
+          onLoginAsStudent={handleLogin}
           onGoToSignup={() => setAuthScreen("signup")}
         />
       </AuthShell>
@@ -156,7 +179,7 @@ export default function App() {
 
   // MAIN APP (ADMIN / STUDENT)
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 flex flex-col">
       <TopBar
         role={role}
         onRoleChange={setRole}
@@ -165,20 +188,18 @@ export default function App() {
         onLogout={handleLogout}
       />
       <div className="flex flex-1 overflow-hidden">
-        {role === "student" && (
-          <Sidebar
-            role={role}
-            studentTab={studentTab}
-            onStudentTabChange={setStudentTab}
-            open={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
-          />
-        )}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 bg-gradient-to-b from-slate-50 via-slate-100 to-slate-200 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
           {role === "admin" ? (
-            adminPage === "list" ? (
+            adminPage === "admin-code" ? (
+              <AdminCodeManager onBack={() => setAdminPage("list")} />
+            ) : adminPage === "domains" ? (
+              <DomainsManagementPage onBack={() => setAdminPage("list")} />
+            ) : adminPage === "courses" ? (
+              <CoursesPage onBack={() => setAdminPage("list")} />
+            ) : adminPage === "list" ? (
               <AdminDashboard
                 students={students}
+                courses={courses}
                 onView={(student) => {
                   setSelectedStudent(student);
                   setAdminPage("view");
@@ -193,6 +214,9 @@ export default function App() {
                   setAdminPage("add");
                 }}
                 onDelete={handleStudentDelete}
+                onManageCourses={() => setAdminPage("courses")}
+                onManageDomains={() => setAdminPage("domains")}
+                onManageAdminCode={() => setAdminPage("admin-code")}
               />
             ) : adminPage === "view" && selectedStudent ? (
               <StudentDashboard
@@ -204,6 +228,7 @@ export default function App() {
                 }))}
                 onBack={() => setAdminPage("list")}
                 showBackForAdmin
+                onTabChange={setStudentTab}
               />
             ) : (
               <StudentEditorPage
@@ -220,9 +245,10 @@ export default function App() {
                 student={currentStudent}
                 tab={studentTab}
                 domainScores={(currentStudent.domain_scores || []).map(d => ({
-                  domain: d.domain_name || d.name || 'Unknown',
+                  domain: d.domain_name || 'Unknown',
                   score: parseFloat(d.score) || 0,
                 }))}
+                onTabChange={setStudentTab}
               />
             ) : (
               <div className="flex items-center justify-center h-full">
