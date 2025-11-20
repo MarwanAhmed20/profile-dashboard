@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Student, Domain, StudentDomainScore, Course, WeeklyProgress
+from .models import Student, Domain, StudentDomainScore, Course, Announcement
 
 
 class StudentDomainScoreInline(admin.TabularInline):
@@ -46,9 +46,10 @@ class CourseAdmin(admin.ModelAdmin):
     get_domain_count.short_description = 'Domains'
 
 
-@admin.register(WeeklyProgress)
-class WeeklyProgressAdmin(admin.ModelAdmin):
-    list_display = ('student', 'week_number', 'week_start_date', 'average_score', 'recorded_at')
-    list_filter = ('student', 'week_start_date')
-    search_fields = ('student__user__username', 'student__user__email')
-    readonly_fields = ('recorded_at',)
+@admin.register(Announcement)
+class AnnouncementAdmin(admin.ModelAdmin):
+    list_display = ('title', 'priority', 'is_active', 'created_by', 'created_at')
+    list_filter = ('priority', 'is_active', 'created_at')
+    search_fields = ('title', 'content')
+    filter_horizontal = ('courses',)
+    readonly_fields = ('created_at', 'updated_at')

@@ -1,6 +1,7 @@
 import React from "react";
 import { Menu, User, LogOut, Sun, Moon } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext";
+import NotificationBell from '../common/NotificationBell';
 
 function RoleToggle({ value, onChange }) {
   return (
@@ -35,6 +36,7 @@ export default function TopBar({
   onToggleSidebar,
   showRoleToggle = true,
   onLogout,
+  onNotificationNavigate,
 }) {
   const { isDark, toggleTheme } = useTheme();
 
@@ -64,6 +66,9 @@ export default function TopBar({
           >
             {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </button>
+
+          {/* Notification Bell */}
+          <NotificationBell onNavigate={onNotificationNavigate} />
 
           {role === "student" && (
             <button

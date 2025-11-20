@@ -2,12 +2,17 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .models import Student, Domain, StudentDomainScore, DomainStrength, DomainWeakness, Course
+from .models import (
+    Student, Domain, StudentDomainScore, DomainStrength, 
+    DomainWeakness, Course, Announcement, AnnouncementRead, Project, Notification
+)
 from .serializers import (StudentSerializer, StudentCreateUpdateSerializer, 
                           DomainSerializer, StudentDomainScoreSerializer, 
                           DomainStrengthSerializer, DomainWeaknessSerializer, 
-                          CourseSerializer)
+                          CourseSerializer, AnnouncementSerializer, AnnouncementCreateUpdateSerializer, 
+                          ProjectSerializer, ProjectCreateUpdateSerializer, ProjectReviewSerializer, NotificationSerializer)
 from rest_framework.permissions import IsAdminUser
+from django.db.models import Q
 
 
 class IsAdminUser(permissions.BasePermission):
@@ -234,10 +239,160 @@ class CourseViewSet(viewsets.ModelViewSet):
         return [permissions.IsAuthenticated()]
 
 
-@api_view(['GET'])
-@permission_classes([permissions.AllowAny])  # Allow anonymous access
-def get_active_courses_for_registration(request):
-    """Get active courses for student registration"""
-    courses = Course.objects.filter(is_active=True).prefetch_related('domains')
-    serializer = CourseSerializer(courses, many=True)
-    return Response(serializer.data)
+class AnnouncementViewSet(viewsets.ModelViewSet):
+    queryset = Announcement.objects.all().prefetch_related('courses').select_related('created_by')
+    
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return AnnouncementCreateUpdateSerializer
+        return AnnouncementSerializer
+    
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve', 'mark_read']:
+            return [permissions.IsAuthenticated()]
+        return [IsAdminUser()]
+    
+    def get_queryset(self):
+        # Admins see all announcements
+        if self.request.user.role == 'admin':
+            return self.queryset
+        
+        # Students only see active announcements within schedule for their course
+        from django.utils import timezone
+        now = timezone.now()
+        
+        queryset = self.queryset.filter(is_active=True)
+        
+        # Filter by schedule
+        queryset = queryset.filter(
+            Q(scheduled_start__isnull=True) | Q(scheduled_start__lte=now)
+        ).filter(
+            Q(scheduled_end__isnull=True) | Q(scheduled_end__gte=now)
+        )
+        
+        try:
+            student = Student.objects.get(user=self.request.user)
+            if student.course:
+                queryset = queryset.filter(courses=student.course)
+            else:
+                queryset = Announcement.objects.none()
+        except Student.DoesNotExist:
+            queryset = Announcement.objects.none()
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+    
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        """Mark an announcement as read"""
+        announcement = self.get_object()
+        try:
+            student = Student.objects.get(user=request.user)
+            AnnouncementRead.objects.get_or_create(
+                student=student,
+                announcement=announcement
+            )
+            return Response({'status': 'marked as read'})
+        except Student.DoesNotExist:
+            return Response(
+                {'error': 'Student profile not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
+class NotificationViewSet(viewsets.ModelViewSet):
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        # Clean up old read notifications before returning results
+        Notification.delete_old_read_notifications()
+        # Users only see their own notifications
+        return Notification.objects.filter(recipient=self.request.user)
+    
+    @action(detail=False, methods=['get'])
+    def unread_count(self, request):
+        """Get count of unread notifications"""
+        count = Notification.objects.filter(
+            recipient=request.user,
+            is_read=False
+        ).count()
+        return Response({'unread_count': count})
+    
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        """Mark a notification as read"""
+        notification = self.get_object()
+        notification.mark_as_read()
+        serializer = self.get_serializer(notification)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'])
+    def mark_all_read(self, request):
+        """Mark all notifications as read"""
+        from django.utils import timezone
+        Notification.objects.filter(
+            recipient=request.user,
+            is_read=False
+        ).update(is_read=True, read_at=timezone.now())
+        return Response({'status': 'all notifications marked as read'})
+    
+    @action(detail=False, methods=['post'])
+    def cleanup_old(self, request):
+        """Manually trigger cleanup of old read notifications"""
+        deleted_count = Notification.delete_old_read_notifications()
+        return Response({'deleted_count': deleted_count})
+
+
+class ProjectViewSet(viewsets.ModelViewSet):
+    queryset = Project.objects.all().select_related('student__user', 'reviewed_by')
+    
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return ProjectCreateUpdateSerializer
+        elif self.action == 'review':
+            return ProjectReviewSerializer
+        return ProjectSerializer
+    
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve', 'create']:
+            return [permissions.IsAuthenticated()]
+        return [IsAdminUser()]
+    
+    def get_queryset(self):
+        queryset = self.queryset
+        
+        # Students see only their projects
+        if self.request.user.role == 'student':
+            try:
+                student = Student.objects.get(user=self.request.user)
+                queryset = queryset.filter(student=student)
+            except Student.DoesNotExist:
+                queryset = Project.objects.none()
+        
+        # Admins see all projects
+        return queryset
+    
+    def perform_create(self, serializer):
+        # Get student from current user
+        student = Student.objects.get(user=self.request.user)
+        serializer.save(student=student)
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def review(self, request, pk=None):
+        """Admin endpoint to review a project"""
+        project = self.get_object()
+        serializer = ProjectReviewSerializer(project, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            from django.utils import timezone
+            serializer.save(
+                reviewed_by=request.user,
+                reviewed_at=timezone.now()
+            )
+            # Notify student about the review
+            project.notify_student_project_reviewed()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -1,6 +1,17 @@
 from rest_framework import serializers
-from .models import Student, Domain, StudentDomainScore, Course, DomainStrength, DomainWeakness
-from apps.users.serializers import UserSerializer
+from .models import (
+    Student, Domain, StudentDomainScore, DomainStrength, 
+    DomainWeakness, Course, Announcement, AnnouncementRead, Project, Notification
+)
+from apps.users.models import User
+
+
+class UserSerializer(serializers.ModelSerializer):
+    """Serializer for User model"""
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'first_name', 'last_name', 'role']
+        read_only_fields = ['id', 'email', 'role']
 
 
 class DomainSerializer(serializers.ModelSerializer):
@@ -155,68 +166,111 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
         return student
 
     def update(self, instance, validated_data):
-        user_data = {}
-        for field in ['username', 'email', 'first_name', 'last_name']:
-            if field in validated_data:
-                user_data[field] = validated_data.pop(field)
+        # Track if course is changing
+        course = validated_data.get('course')
+        if course and course != instance.course:
+            instance._course_changed = True
         
-        password = validated_data.pop('password', None)
-        domains_data = validated_data.pop('domains', None)
-        course_id = validated_data.pop('course_id', None)
-        
-        # Update user
-        if user_data:
-            for key, value in user_data.items():
-                setattr(instance.user, key, value)
-            if password:
-                instance.user.set_password(password)
-            instance.user.save()
-        
-        # Update student
-        for key, value in validated_data.items():
-            setattr(instance, key, value)
-        
-        # Update course
-        if course_id is not None:
-            instance.course_id = course_id
+        # Update fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
         
         instance.save()
-        
-        # Update domain scores with strengths and weaknesses
-        if domains_data is not None:
-            # Delete old domain scores (cascade will handle strengths/weaknesses)
-            instance.domain_scores.all().delete()
-            
-            # Create new domain scores (skip auto-calculation during batch)
-            for domain_data in domains_data:
-                domain_score = StudentDomainScore(
-                    student=instance,
-                    domain_id=domain_data['domain_id'],
-                    score=domain_data['score']
-                )
-                domain_score.save(skip_calculation=True)
-                
-                # Add strengths
-                for strength_data in domain_data.get('strengths', []):
-                    if strength_data.get('title'):
-                        DomainStrength.objects.create(
-                            student_domain=domain_score,
-                            title=strength_data['title'],
-                            description=strength_data.get('description', '')
-                        )
-                
-                # Add weaknesses
-                for weakness_data in domain_data.get('weaknesses', []):
-                    if weakness_data.get('title'):
-                        DomainWeakness.objects.create(
-                            student_domain=domain_score,
-                            title=weakness_data['title'],
-                            description=weakness_data.get('description', ''),
-                            improvement_suggestion=weakness_data.get('improvement_suggestion', '')
-                        )
-            
-            # Calculate overall score and domains mastered after ALL domains are updated
-            instance.calculate_overall_score()
-            instance.update_domains_mastered()
-        
         return instance
+
+
+class AnnouncementSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+    course_names = serializers.SerializerMethodField()
+    is_read = serializers.SerializerMethodField()
+    is_scheduled = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Announcement
+        fields = [
+            'id', 'title', 'content', 'courses', 'course_names',
+            'created_by', 'created_by_name', 'is_active', 'priority',
+            'scheduled_start', 'scheduled_end', 'is_scheduled',
+            'created_at', 'updated_at', 'is_read'
+        ]
+        read_only_fields = ['created_by', 'created_at', 'updated_at']
+    
+    def get_created_by_name(self, obj):
+        return obj.created_by.get_full_name() or obj.created_by.email
+    
+    def get_course_names(self, obj):
+        return [course.name for course in obj.courses.all()]
+    
+    def get_is_read(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and request.user.role == 'student':
+            try:
+                student = Student.objects.get(user=request.user)
+                return AnnouncementRead.objects.filter(student=student, announcement=obj).exists()
+            except Student.DoesNotExist:
+                return False
+        return False
+    
+    def get_is_scheduled(self, obj):
+        """Check if announcement has scheduling"""
+        return bool(obj.scheduled_start or obj.scheduled_end)
+
+
+class AnnouncementCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Announcement
+        fields = ['id', 'title', 'content', 'courses', 'is_active', 'priority', 'scheduled_start', 'scheduled_end']
+    
+    def validate(self, data):
+        """Validate that end date is after start date"""
+        if data.get('scheduled_start') and data.get('scheduled_end'):
+            if data['scheduled_end'] <= data['scheduled_start']:
+                raise serializers.ValidationError({
+                    'scheduled_end': 'End date must be after start date'
+                })
+        return data
+
+
+class ProjectSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    reviewed_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Project
+        fields = [
+            'id', 'student', 'student_name', 'title', 'description', 
+            'project_url', 'submission_date', 'status', 'grade', 'feedback',
+            'reviewed_by', 'reviewed_by_name', 'reviewed_at', 
+            'technologies_used', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['submission_date', 'reviewed_by', 'reviewed_at', 'created_at', 'updated_at']
+    
+    def get_student_name(self, obj):
+        return obj.student.user.get_full_name() or obj.student.user.email
+    
+    def get_reviewed_by_name(self, obj):
+        if obj.reviewed_by:
+            return obj.reviewed_by.get_full_name() or obj.reviewed_by.email
+        return None
+
+
+class ProjectCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = ['id', 'title', 'description', 'project_url', 'technologies_used']
+
+
+class ProjectReviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = ['status', 'grade', 'feedback']
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = [
+            'id', 'notification_type', 'title', 'message', 
+            'related_project', 'route_url', 'is_read', 'read_at', 'created_at'
+        ]
+        read_only_fields = ['created_at', 'read_at']

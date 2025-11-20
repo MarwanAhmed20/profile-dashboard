@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import DomainScoreEditor from "./DomainScoreEditor";
 import { coursesAPI } from "../../services/api";
+import { Award, Grid, Target } from 'lucide-react';
+import ProjectReview from './ProjectReview';
 
 export default function StudentEditorPage({
   mode,
@@ -9,6 +11,7 @@ export default function StudentEditorPage({
   onBack,
   onSave,
 }) {
+  const [activeTab, setActiveTab] = useState('info');
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -245,259 +248,212 @@ export default function StudentEditorPage({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">
+          <h1 className="text-3xl font-bold text-slate-100">
             {mode === "edit" ? "Edit Student" : "Add New Student"}
           </h1>
-          <p className="text-slate-400 mt-2">
-            {mode === "edit"
-              ? "Update student information and domain scores"
-              : "Create a new student profile"}
+          <p className="text-slate-400 mt-1">
+            {mode === "edit" ? "Update student information and scores" : "Create a new student profile"}
           </p>
         </div>
         <button
           onClick={onBack}
-          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+          className="px-5 py-2.5 rounded-xl border border-slate-600 bg-transparent text-slate-300 hover:bg-slate-800 transition-all font-medium"
         >
-          Cancel
+          ← Back
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Student Information */}
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <h2 className="text-xl font-semibold mb-4">Student Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                First Name *
-              </label>
-              <input
-                type="text"
-                name="first_name"
-                value={formData.first_name}
-                onChange={handleChange}
-                className={`w-full px-4 py-2 bg-slate-700 border ${
-                  errors.first_name ? "border-red-500" : "border-slate-600"
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-              />
-              {errors.first_name && (
-                <p className="text-red-400 text-sm mt-1">{errors.first_name}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Last Name *
-              </label>
-              <input
-                type="text"
-                name="last_name"
-                value={formData.last_name}
-                onChange={handleChange}
-                className={`w-full px-4 py-2 bg-slate-700 border ${
-                  errors.last_name ? "border-red-500" : "border-slate-600"
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-              />
-              {errors.last_name && (
-                <p className="text-red-400 text-sm mt-1">{errors.last_name}</p>
-              )}
-            </div>
-
-
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Email *
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                className={`w-full px-4 py-2 bg-slate-700 border ${
-                  errors.email ? "border-red-500" : "border-slate-600"
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-              />
-              {errors.email && (
-                <p className="text-red-400 text-sm mt-1">{errors.email}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Student ID
-              </label>
-              <input
-                type="text"
-                value={student?.student_id || 'Auto-generated'}
-                disabled
-                className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg opacity-50 cursor-not-allowed"
-              />
-              <p className="text-xs text-slate-400 mt-1">Auto-generated on creation</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Password {mode === "add" && "*"}
-              </label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder={mode === "edit" ? "Leave blank to keep current" : ""}
-                className={`w-full px-4 py-2 bg-slate-700 border ${
-                  errors.password ? "border-red-500" : "border-slate-600"
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-              />
-              {errors.password && (
-                <p className="text-red-400 text-sm mt-1">{errors.password}</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Program & Progress Information */}
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <h2 className="text-xl font-semibold mb-4">Program & Progress</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium mb-2">Select Course</label>
-              <select
-                value={formData.course_id || ''}
-                onChange={handleCourseChange}
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">No Course (Manual Setup)</option>
-                {Array.isArray(courses) && courses.map(course => (
-                  <option key={course.id} value={course.id}>
-                    {course.name} ({course.duration_weeks} weeks, {course.domains?.length || 0} domains)
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-slate-400 mt-1">
-                {formData.course_id 
-                  ? '✅ Course domains synced automatically'
-                  : `Select a course (${courses.length} available)`}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Next Milestone</label>
-              <input
-                type="text"
-                name="next_milestone"
-                value={formData.next_milestone}
-                onChange={handleChange}
-                placeholder="e.g., Portfolio checkpoint"
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Overall Score
-              </label>
-              <input
-                type="text"
-                value={student?.overall_score ? `${parseFloat(student.overall_score).toFixed(1)}%` : 'Auto-calculated'}
-                disabled
-                className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg opacity-50 cursor-not-allowed"
-              />
-              <p className="text-xs text-slate-400 mt-1">Calculated automatically from domain scores</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Domains Mastered
-              </label>
-              <input
-                type="text"
-                value={student?.domains_mastered !== undefined 
-                  ? `${student.domains_mastered} / ${formData.total_domains}`
-                  : 'Auto-calculated'}
-                disabled
-                className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg opacity-50 cursor-not-allowed"
-              />
-              <p className="text-xs text-slate-400 mt-1">Auto-counted (scores ≥ 80%)</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Feedback Section */}
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <h2 className="text-xl font-semibold mb-4">Summary & Feedback</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Overall Summary</label>
-              <textarea
-                name="overall_summary"
-                value={formData.overall_summary}
-                onChange={handleChange}
-                placeholder="Write an overall summary of the student's progress..."
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
-                rows="4"
-              />
-              <p className="text-xs text-slate-400 mt-1">Visible to student and admin</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Trainer Feedback</label>
-              <textarea
-                name="trainer_feedback"
-                value={formData.trainer_feedback}
-                onChange={handleChange}
-                placeholder="Provide specific trainer feedback..."
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
-                rows="4"
-              />
-              <p className="text-xs text-slate-400 mt-1">Trainer's perspective on progress and areas to focus</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Domain Scores with Strengths & Weaknesses */}
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <h2 className="text-xl font-semibold mb-4">Domain Scores & Feedback</h2>
-          <div className="space-y-6">
-            {domainScores.map((ds) => (
-              <DomainScoreEditor
-                key={ds.domain_id}
-                domainScore={ds}
-                onScoreChange={handleDomainScoreChange}
-                onStrengthsChange={handleStrengthsChange}
-                onWeaknessesChange={handleWeaknessesChange}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-4 justify-end">
+      {/* Tabs */}
+      <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden shadow-lg">
+        <div className="flex gap-2 px-2 py-2">
           <button
-            type="button"
+            onClick={() => setActiveTab('info')}
+            className={`
+              flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all
+              ${activeTab === 'info'
+                ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/50"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
+              }
+            `}
+          >
+            <Grid className="w-4 h-4" />
+            <span>Student Information</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('domains')}
+            className={`
+              flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all
+              ${activeTab === 'domains'
+                ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/50"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
+              }
+            `}
+          >
+            <Target className="w-4 h-4" />
+            <span>Domain Scores</span>
+          </button>
+
+          {mode === 'edit' && (
+            <button
+              onClick={() => setActiveTab('projects')}
+              className={`
+                flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all
+                ${activeTab === 'projects'
+                  ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/50"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
+                }
+              `}
+            >
+              <Award className="w-4 h-4" />
+              <span>Projects</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      <div className="bg-slate-800/40 backdrop-blur-sm rounded-2xl border border-slate-700/50 shadow-xl">
+        {activeTab === 'info' && (
+          <div className="p-8">
+            <h2 className="text-xl font-bold text-slate-100 mb-6">Basic Information</h2>
+            {/* Student Information Form */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  First Name *
+                </label>
+                <input
+                  type="text"
+                  name="first_name"
+                  value={formData.first_name}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-2 bg-slate-700 border ${
+                    errors.first_name ? "border-red-500" : "border-slate-600"
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                />
+                {errors.first_name && (
+                  <p className="text-red-400 text-sm mt-1">{errors.first_name}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Last Name *
+                </label>
+                <input
+                  type="text"
+                  name="last_name"
+                  value={formData.last_name}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-2 bg-slate-700 border ${
+                    errors.last_name ? "border-red-500" : "border-slate-600"
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                />
+                {errors.last_name && (
+                  <p className="text-red-400 text-sm mt-1">{errors.last_name}</p>
+                )}
+              </div>
+
+
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Email *
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-2 bg-slate-700 border ${
+                    errors.email ? "border-red-500" : "border-slate-600"
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                />
+                {errors.email && (
+                  <p className="text-red-400 text-sm mt-1">{errors.email}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Student ID
+                </label>
+                <input
+                  type="text"
+                  value={student?.student_id || 'Auto-generated'}
+                  disabled
+                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg opacity-50 cursor-not-allowed"
+                />
+                <p className="text-xs text-slate-400 mt-1">Auto-generated on creation</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Password {mode === "add" && "*"}
+                </label>
+                <input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder={mode === "edit" ? "Leave blank to keep current" : ""}
+                  className={`w-full px-4 py-2 bg-slate-700 border ${
+                    errors.password ? "border-red-500" : "border-slate-600"
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                />
+                {errors.password && (
+                  <p className="text-red-400 text-sm mt-1">{errors.password}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'domains' && (
+          <div className="p-8">
+            <h2 className="text-xl font-bold text-slate-100 mb-6">Domain Scores & Feedback</h2>
+            <div className="space-y-6">
+              {domainScores.map((ds) => (
+                <DomainScoreEditor
+                  key={ds.domain_id}
+                  domainScore={ds}
+                  onScoreChange={handleDomainScoreChange}
+                  onStrengthsChange={handleStrengthsChange}
+                  onWeaknessesChange={handleWeaknessesChange}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'projects' && mode === 'edit' && (
+          <ProjectReview studentId={student?.id} />
+        )}
+      </div>
+
+      {/* Save/Cancel Buttons - Only show on info and domains tabs */}
+      {activeTab !== 'projects' && (
+        <div className="flex justify-end gap-3">
+          <button
             onClick={onBack}
-            disabled={loading}
-            className="px-6 py-3 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 rounded-lg font-medium transition-colors"
+            className="px-6 py-3 rounded-xl border border-slate-600 bg-transparent text-slate-300 hover:bg-slate-800 transition-all font-semibold"
           >
             Cancel
           </button>
           <button
-            type="submit"
+            onClick={handleSubmit}
             disabled={loading}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg font-medium transition-colors"
+            className="px-8 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-800 text-white font-bold transition-all shadow-lg disabled:cursor-not-allowed"
           >
-            {loading
-              ? "Saving..."
-              : mode === "edit"
-              ? "Update Student"
-              : "Create Student"}
+            {loading ? 'Saving...' : (mode === "edit" ? "Update Student" : "Create Student")}
           </button>
         </div>
-      </form>
+      )}
     </div>
   );
 }

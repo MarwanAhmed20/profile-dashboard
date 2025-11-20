@@ -18,13 +18,20 @@ export default function AdminDashboard({
   onDelete, 
   onManageCourses, 
   onManageDomains, 
-  onManageAdminCode 
+  onManageAdminCode,
+  onManageAnnouncements
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCourse, setFilterCourse] = useState("all");
   const [sortBy, setSortBy] = useState("name");
   const [sortOrder, setSortOrder] = useState("asc");
-  const [showFilters, setShowFilters] = useState(false);
+
+  // Ensure students is always an array
+  const studentsArray = useMemo(() => {
+    if (Array.isArray(students)) return students;
+    if (students?.results) return students.results;
+    return [];
+  }, [students]);
 
   // Calculate overall stats
   const overallStats = useMemo(() => {
@@ -33,15 +40,15 @@ export default function AdminDashboard({
     const activeCourses = coursesArray.filter(c => c.is_active).length;
     
     return {
-      totalStudents: students.length,
+      totalStudents: studentsArray.length,
       totalCourses,
       activeCourses
     };
-  }, [students, courses]);
+  }, [studentsArray, courses]);
 
   // Filter and search students
   const filteredStudents = useMemo(() => {
-    return students.filter((s) => {
+    return studentsArray.filter((s) => {
       const fullName = `${s.user?.first_name || ""} ${s.user?.last_name || ""}`.toLowerCase();
       const email = (s.user?.email || "").toLowerCase();
       const studentId = (s.student_id || "").toLowerCase();
@@ -60,16 +67,16 @@ export default function AdminDashboard({
       
       return matchesSearch && matchesCourse;
     });
-  }, [students, searchTerm, filterCourse]);
+  }, [studentsArray, searchTerm, filterCourse]);
 
   // Calculate filtered stats based on selected course
   const filteredStats = useMemo(() => {
     const selectedCourse = courses.find(c => c.id === parseInt(filterCourse));
     const studentsInCourse = filterCourse === "all" 
-      ? students 
+      ? studentsArray 
       : filterCourse === "none"
-      ? students.filter(s => !s.course)
-      : students.filter(s => s.course?.id === parseInt(filterCourse));
+      ? studentsArray.filter(s => !s.course)
+      : studentsArray.filter(s => s.course?.id === parseInt(filterCourse));
     
     const avgProgress = studentsInCourse.length > 0
       ? (studentsInCourse.reduce((sum, s) => sum + parseFloat(s.overall_score || 0), 0) / studentsInCourse.length).toFixed(1)
@@ -83,7 +90,7 @@ export default function AdminDashboard({
       numDomains,
       courseName: selectedCourse?.name || (filterCourse === "none" ? "No Course" : "All Courses")
     };
-  }, [students, courses, filterCourse]);
+  }, [studentsArray, courses, filterCourse]);
 
   // Sort students
   const sortedStudents = useMemo(() => {
@@ -120,6 +127,13 @@ export default function AdminDashboard({
         </div>
         
         <div className="flex gap-3">
+          <Button 
+            variant="outline" 
+            size="md" 
+            onClick={onManageAnnouncements}
+          >
+            📢 Announcements
+          </Button>
           <Button 
             variant="outline" 
             size="md" 
@@ -382,16 +396,13 @@ export default function AdminDashboard({
         </div>
 
         {/* Table Footer */}
-        <div className="flex items-center justify-between px-6 py-4 bg-slate-900/20 border-t border-slate-700/50">
-          <p className="text-sm text-slate-400">
-            Showing <span className="font-semibold text-slate-200">{sortedStudents.length}</span> of{' '}
-            <span className="font-semibold text-slate-200">{students.length}</span> students
-          </p>
-          {filterCourse !== "all" && (
-            <p className="text-xs text-slate-500">
-              Filtered by: <span className="text-indigo-400">{filteredStats.courseName}</span>
-            </p>
-          )}
+        <div className="flex items-center justify-between px-6 py-4 text-sm text-slate-400 border-t border-slate-800 bg-slate-950/80">
+          <span className="font-medium">
+            Showing {sortedStudents.length} of {studentsArray.length} students
+          </span>
+          <span className="text-xs text-slate-500">
+            {filterCourse !== "all" && `Filtered by: ${filteredStats.courseName}`}
+          </span>
         </div>
       </div>
     </div>

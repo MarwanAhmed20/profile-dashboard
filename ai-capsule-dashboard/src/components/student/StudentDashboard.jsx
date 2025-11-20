@@ -1,10 +1,12 @@
 import React from "react";
-import { ArrowLeft, Grid, BarChart2, TrendingUp, CheckCircle, BookOpen } from "lucide-react";
+import { ArrowLeft, Grid, BarChart2, TrendingUp, CheckCircle, BookOpen, Award } from "lucide-react";
 import ProgressBar from "../common/ProgressBar";
 import { getInitials } from "../../utils/getInitials";
 import StudentDomainsSection from "./StudentDomainsSection";
 import StudentAnalysisSection from "./StudentAnalysisSection";
 import { studentsAPI } from "../../services/api";
+import AnnouncementFeed from './AnnouncementFeed';
+import StudentProjects from './StudentProjects';
 
 export default function StudentDashboard({
   student,
@@ -164,6 +166,9 @@ export default function StudentDashboard({
         </div>
       </div>
 
+      {/* Announcement Feed */}
+      <AnnouncementFeed />
+
       {/* Tabs - Enhanced */}
       {onTabChange && (
         <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden shadow-lg">
@@ -180,6 +185,19 @@ export default function StudentDashboard({
             >
               <Grid className="w-4 h-4" />
               <span>Overview</span>
+            </button>
+            <button
+              onClick={() => onTabChange("projects")}
+              className={`
+                flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all
+                ${tab === "projects"
+                  ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/50"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
+                }
+              `}
+            >
+              <Award className="w-4 h-4" />
+              <span>Projects</span>
             </button>
             <button
               onClick={() => onTabChange("analysis")}
@@ -201,6 +219,7 @@ export default function StudentDashboard({
       {/* Content */}
       {tab === "home" ? (
         <div className="space-y-5">
+
           {/* Section Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -220,6 +239,8 @@ export default function StudentDashboard({
 
           <StudentDomainsSection student={student} />
         </div>
+      ) : tab === "projects" ? (
+        <StudentProjects student={student} isAdmin={showBackForAdmin} />
       ) : (
         loading ? (
           <div className="flex items-center justify-center py-12">

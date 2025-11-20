@@ -24,6 +24,7 @@ npm run dev
 ### Create Admin Account
 ```bash
 cd backend
+python manage.py runserver
 python manage.py shell
 ```
 ```python

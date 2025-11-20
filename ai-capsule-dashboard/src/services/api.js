@@ -63,23 +63,23 @@ export const authAPI = {
 };
 
 export const studentsAPI = {
-  getAll: () => apiCall('/students/'),
+  getAll: () => apiCall('/students/list/'),
   getMe: () => apiCall('/students/me/'),
-  getById: (id) => apiCall(`/students/${id}/`),
-  getStrengthsWeaknesses: (id) => apiCall(`/students/${id}/strengths-weaknesses/`),
-  getWeeklyProgress: (id) => apiCall(`/students/${id}/weekly-progress/`),
+  getById: (id) => apiCall(`/students/list/${id}/`),
+  getStrengthsWeaknesses: (id) => apiCall(`/students/list/${id}/strengths-weaknesses/`),
+  getWeeklyProgress: (id) => apiCall(`/students/list/${id}/weekly-progress/`),
   create: (data) =>
-    apiCall('/students/', {
+    apiCall('/students/list/', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   update: (id, data) =>
-    apiCall(`/students/${id}/`, {
+    apiCall(`/students/list/${id}/`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
   delete: (id) =>
-    apiCall(`/students/${id}/`, { method: 'DELETE' }),
+    apiCall(`/students/list/${id}/`, { method: 'DELETE' }),
 };
 
 export const domainsAPI = {
@@ -104,18 +104,76 @@ export const assessmentsAPI = {
 };
 
 export const coursesAPI = {
-  getAll: () => apiCall('/courses/'),
-  getById: (id) => apiCall(`/courses/${id}/`),
+  getAll: () => apiCall('/students/courses/'),
+  getById: (id) => apiCall(`/students/courses/${id}/`),
   create: (data) =>
-    apiCall('/courses/', {
+    apiCall('/students/courses/', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   update: (id, data) =>
-    apiCall(`/courses/${id}/`, {
+    apiCall(`/students/courses/${id}/`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
   delete: (id) =>
-    apiCall(`/courses/${id}/`, { method: 'DELETE' }),
+    apiCall(`/students/courses/${id}/`, { method: 'DELETE' }),
+};
+
+export const announcementsAPI = {
+  getAll: () => apiCall('/students/announcements/'),
+  getById: (id) => apiCall(`/students/announcements/${id}/`),
+  create: (data) =>
+    apiCall('/students/announcements/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  update: (id, data) =>
+    apiCall(`/students/announcements/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  delete: (id) =>
+    apiCall(`/students/announcements/${id}/`, { method: 'DELETE' }),
+};
+
+export const projectsAPI = {
+  getAll: () => apiCall('/students/projects/'),
+  getById: (id) => apiCall(`/students/projects/${id}/`),
+  create: (data) =>
+    apiCall('/students/projects/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  update: (id, data) =>
+    apiCall(`/students/projects/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  delete: (id) =>
+    apiCall(`/students/projects/${id}/`, { method: 'DELETE' }),
+  review: (id, data) =>
+    apiCall(`/students/projects/${id}/review/`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getNotifications: () => apiCall('/students/projects/notifications/'),
+  markNotificationsRead: (projectIds) =>
+    apiCall('/students/projects/mark_notifications_read/', {
+      method: 'POST',
+      body: JSON.stringify({ project_ids: projectIds }),
+    }),
+};
+
+export const notificationsAPI = {
+  getAll: () => apiCall('/students/notifications/'),
+  getUnreadCount: () => apiCall('/students/notifications/unread_count/'),
+  markRead: (id) =>
+    apiCall(`/students/notifications/${id}/mark_read/`, {
+      method: 'POST',
+    }),
+  markAllRead: () =>
+    apiCall('/students/notifications/mark_all_read/', {
+      method: 'POST',
+    }),
 };

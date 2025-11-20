@@ -14,6 +14,7 @@ import StudentEditorPage from "./components/admin/StudentEditorPage";
 import CoursesPage from './components/admin/CoursesPage';
 import DomainsManagementPage from './components/admin/DomainsManagementPage';
 import AdminCodeManager from './components/admin/AdminCodeManager';
+import AnnouncementManager from './components/admin/AnnouncementManager';
 
 import { authAPI, studentsAPI, domainsAPI, coursesAPI } from "./services/api";
 
@@ -22,13 +23,15 @@ export default function App() {
   const [role, setRole] = useState(null);
   const [studentTab, setStudentTab] = useState("home");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [adminPage, setAdminPage] = useState("list"); // "list", "view", "edit", "add", "courses", "domains", "admin-code"
+  const [adminPage, setAdminPage] = useState("list"); // Add "announcements" to the list
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [students, setStudents] = useState([]);
   const [currentStudent, setCurrentStudent] = useState(null);
   const [domains, setDomains] = useState([]);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Add a new state to track if we should open projects tab
+  const [initialTab, setInitialTab] = useState("home");
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -36,6 +39,14 @@ export default function App() {
       loadUserData();
     } else {
       setLoading(false);
+    }
+  }, []);
+
+  // Check URL hash for routing (e.g., #/admin/student/5/projects)
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes('/projects')) {
+      setInitialTab('projects');
     }
   }, []);
 
@@ -49,8 +60,21 @@ export default function App() {
       setDomains(domainsData);
       
       if (profile.role === 'admin') {
-        const studentsData = await studentsAPI.getAll();
-        setStudents(studentsData.results || studentsData);
+        try {
+          const studentsData = await studentsAPI.getAll();
+          console.log('Students API response:', studentsData);
+          
+          // Handle both array and paginated response
+          const studentsArray = Array.isArray(studentsData) 
+            ? studentsData 
+            : (studentsData.results || []);
+          
+          console.log('Setting students:', studentsArray);
+          setStudents(studentsArray);
+        } catch (error) {
+          console.error('Failed to load students:', error);
+          setStudents([]);
+        }
 
         try {
           const coursesData = await coursesAPI.getAll();
@@ -145,6 +169,21 @@ export default function App() {
     }
   };
 
+  const handleNotificationNavigation = ({ studentId, tab }) => {
+    if (role === 'admin' && studentId) {
+      // Admin viewing student's project
+      const student = students.find(s => s.id === studentId);
+      if (student) {
+        setSelectedStudent(student);
+        setAdminPage('view');
+        setStudentTab(tab || 'projects');
+      }
+    } else if (role === 'student' && tab) {
+      // Student viewing their own projects
+      setStudentTab(tab);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
@@ -186,11 +225,14 @@ export default function App() {
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         showRoleToggle={false}
         onLogout={handleLogout}
+        onNotificationNavigate={handleNotificationNavigation}
       />
       <div className="flex flex-1 overflow-hidden">
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 bg-gradient-to-b from-slate-50 via-slate-100 to-slate-200 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
           {role === "admin" ? (
-            adminPage === "admin-code" ? (
+            adminPage === "announcements" ? (
+              <AnnouncementManager onBack={() => setAdminPage("list")} />
+            ) : adminPage === "admin-code" ? (
               <AdminCodeManager onBack={() => setAdminPage("list")} />
             ) : adminPage === "domains" ? (
               <DomainsManagementPage onBack={() => setAdminPage("list")} />
@@ -217,18 +259,25 @@ export default function App() {
                 onManageCourses={() => setAdminPage("courses")}
                 onManageDomains={() => setAdminPage("domains")}
                 onManageAdminCode={() => setAdminPage("admin-code")}
+                onManageAnnouncements={() => setAdminPage("announcements")}
               />
             ) : adminPage === "view" && selectedStudent ? (
               <StudentDashboard
                 student={selectedStudent}
-                tab={studentTab}
+                tab={initialTab || studentTab}
                 domainScores={(selectedStudent.domain_scores || []).map(d => ({
                   domain: d.domain_name || 'Unknown',
                   score: parseFloat(d.score) || 0,
                 }))}
-                onBack={() => setAdminPage("list")}
+                onBack={() => {
+                  setAdminPage("list");
+                  setInitialTab("home");
+                }}
                 showBackForAdmin
-                onTabChange={setStudentTab}
+                onTabChange={(tab) => {
+                  setStudentTab(tab);
+                  setInitialTab(null);
+                }}
               />
             ) : (
               <StudentEditorPage
